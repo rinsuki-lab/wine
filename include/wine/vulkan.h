@@ -782,6 +782,7 @@ typedef enum VkChromaLocation
     VK_CHROMA_LOCATION_MIDPOINT = 1,
     VK_CHROMA_LOCATION_MAX_ENUM = 0x7fffffff,
 } VkChromaLocation;
+typedef VkChromaLocation VkChromaLocationKHR;
 
 typedef enum VkCoarseSampleOrderTypeNV
 {
@@ -999,6 +1000,7 @@ typedef enum VkDescriptorUpdateTemplateType
     VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_PUSH_DESCRIPTORS_KHR = 1,
     VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_MAX_ENUM = 0x7fffffff,
 } VkDescriptorUpdateTemplateType;
+typedef VkDescriptorUpdateTemplateType VkDescriptorUpdateTemplateTypeKHR;
 
 typedef enum VkDeviceGroupPresentModeFlagBitsKHR
 {
@@ -1066,6 +1068,7 @@ typedef enum VkExternalFenceFeatureFlagBits
     VK_EXTERNAL_FENCE_FEATURE_IMPORTABLE_BIT = 0x00000002,
     VK_EXTERNAL_FENCE_FEATURE_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkExternalFenceFeatureFlagBits;
+typedef VkExternalFenceFeatureFlagBits VkExternalFenceFeatureFlagBitsKHR;
 
 typedef enum VkExternalFenceHandleTypeFlagBits
 {
@@ -1075,6 +1078,7 @@ typedef enum VkExternalFenceHandleTypeFlagBits
     VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT = 0x00000008,
     VK_EXTERNAL_FENCE_HANDLE_TYPE_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkExternalFenceHandleTypeFlagBits;
+typedef VkExternalFenceHandleTypeFlagBits VkExternalFenceHandleTypeFlagBitsKHR;
 
 typedef enum VkExternalMemoryFeatureFlagBits
 {
@@ -1083,6 +1087,7 @@ typedef enum VkExternalMemoryFeatureFlagBits
     VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT = 0x00000004,
     VK_EXTERNAL_MEMORY_FEATURE_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkExternalMemoryFeatureFlagBits;
+typedef VkExternalMemoryFeatureFlagBits VkExternalMemoryFeatureFlagBitsKHR;
 
 typedef enum VkExternalMemoryHandleTypeFlagBits
 {
@@ -1097,6 +1102,7 @@ typedef enum VkExternalMemoryHandleTypeFlagBits
     VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_MAPPED_FOREIGN_MEMORY_BIT_EXT = 0x00000100,
     VK_EXTERNAL_MEMORY_HANDLE_TYPE_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkExternalMemoryHandleTypeFlagBits;
+typedef VkExternalMemoryHandleTypeFlagBits VkExternalMemoryHandleTypeFlagBitsKHR;
 
 typedef enum VkExternalSemaphoreFeatureFlagBits
 {
@@ -1104,6 +1110,7 @@ typedef enum VkExternalSemaphoreFeatureFlagBits
     VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT = 0x00000002,
     VK_EXTERNAL_SEMAPHORE_FEATURE_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkExternalSemaphoreFeatureFlagBits;
+typedef VkExternalSemaphoreFeatureFlagBits VkExternalSemaphoreFeatureFlagBitsKHR;
 
 typedef enum VkExternalSemaphoreHandleTypeFlagBits
 {
@@ -1114,6 +1121,7 @@ typedef enum VkExternalSemaphoreHandleTypeFlagBits
     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT = 0x00000010,
     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkExternalSemaphoreHandleTypeFlagBits;
+typedef VkExternalSemaphoreHandleTypeFlagBits VkExternalSemaphoreHandleTypeFlagBitsKHR;
 
 typedef enum VkFenceCreateFlagBits
 {
@@ -1126,6 +1134,7 @@ typedef enum VkFenceImportFlagBits
     VK_FENCE_IMPORT_TEMPORARY_BIT = 0x00000001,
     VK_FENCE_IMPORT_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkFenceImportFlagBits;
+typedef VkFenceImportFlagBits VkFenceImportFlagBitsKHR;
 
 typedef enum VkFilter
 {
@@ -1602,6 +1611,7 @@ typedef enum VkMemoryAllocateFlagBits
     VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR = 0x00000004,
     VK_MEMORY_ALLOCATE_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkMemoryAllocateFlagBits;
+typedef VkMemoryAllocateFlagBits VkMemoryAllocateFlagBitsKHR;
 
 typedef enum VkMemoryHeapFlagBits
 {
@@ -1677,6 +1687,7 @@ typedef enum VkPeerMemoryFeatureFlagBits
     VK_PEER_MEMORY_FEATURE_GENERIC_DST_BIT = 0x00000008,
     VK_PEER_MEMORY_FEATURE_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkPeerMemoryFeatureFlagBits;
+typedef VkPeerMemoryFeatureFlagBits VkPeerMemoryFeatureFlagBitsKHR;
 
 typedef enum VkPerformanceConfigurationTypeINTEL
 {
@@ -1844,6 +1855,7 @@ typedef enum VkPointClippingBehavior
     VK_POINT_CLIPPING_BEHAVIOR_USER_CLIP_PLANES_ONLY = 1,
     VK_POINT_CLIPPING_BEHAVIOR_MAX_ENUM = 0x7fffffff,
 } VkPointClippingBehavior;
+typedef VkPointClippingBehavior VkPointClippingBehaviorKHR;
 
 typedef enum VkPolygonMode
 {
@@ -2063,6 +2075,7 @@ typedef enum VkSamplerYcbcrModelConversion
     VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_2020 = 4,
     VK_SAMPLER_YCBCR_MODEL_CONVERSION_MAX_ENUM = 0x7fffffff,
 } VkSamplerYcbcrModelConversion;
+typedef VkSamplerYcbcrModelConversion VkSamplerYcbcrModelConversionKHR;
 
 typedef enum VkSamplerYcbcrRange
 {
@@ -2070,6 +2083,7 @@ typedef enum VkSamplerYcbcrRange
     VK_SAMPLER_YCBCR_RANGE_ITU_NARROW = 1,
     VK_SAMPLER_YCBCR_RANGE_MAX_ENUM = 0x7fffffff,
 } VkSamplerYcbcrRange;
+typedef VkSamplerYcbcrRange VkSamplerYcbcrRangeKHR;
 
 typedef enum VkScopeNV
 {
@@ -2085,6 +2099,7 @@ typedef enum VkSemaphoreImportFlagBits
     VK_SEMAPHORE_IMPORT_TEMPORARY_BIT = 0x00000001,
     VK_SEMAPHORE_IMPORT_FLAG_BITS_MAX_ENUM = 0x7fffffff,
 } VkSemaphoreImportFlagBits;
+typedef VkSemaphoreImportFlagBits VkSemaphoreImportFlagBitsKHR;
 
 typedef enum VkSemaphoreTypeKHR
 {
@@ -2578,6 +2593,7 @@ typedef enum VkTessellationDomainOrigin
     VK_TESSELLATION_DOMAIN_ORIGIN_LOWER_LEFT = 1,
     VK_TESSELLATION_DOMAIN_ORIGIN_MAX_ENUM = 0x7fffffff,
 } VkTessellationDomainOrigin;
+typedef VkTessellationDomainOrigin VkTessellationDomainOriginKHR;
 
 typedef enum VkToolPurposeFlagBitsEXT
 {
