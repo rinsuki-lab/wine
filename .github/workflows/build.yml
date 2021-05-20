@@ -44,7 +44,7 @@ jobs:
         source .github/workflows/env.sh
         mkdir build32
         cd build32
-        ../configure --enable-win32on64 --with-wine64=../build64 --disable-winedbg --disable-tests --without-x --disable-mscms --prefix=/opt/crossover-wine ac_cv_lib_soname_MoltenVK=libMoltenVK.dylib ac_cv_lib_soname_vulkan=
+        ../configure --enable-win32on64 --with-wine64=../build64 --disable-winedbg --disable-tests --disable-winevulkan --without-x --without-vulkan --disable-mscms --prefix=/opt/crossover-wine
         make -j4
         make install
     - name: Archive
