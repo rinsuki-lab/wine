@@ -36,6 +36,28 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(display);
 
+/* CrossOver Hack #18576: don't check for kDisplayModeSafeFlag on Apple Silicon. */
+#include <sys/types.h>
+#include <sys/sysctl.h>
+static int apple_silicon_status;
+static BOOL CALLBACK init_is_apple_silicon(INIT_ONCE* once, void* param, void** context)
+{
+    /* returns 0 for native process or on error, 1 for translated */
+    int ret = 0;
+    size_t size = sizeof(ret);
+    if (sysctlbyname("sysctl.proc_translated", &ret, &size, NULL, 0) == -1)
+        apple_silicon_status = 0;
+    else
+        apple_silicon_status = ret;
+
+    return TRUE;
+}
+static int is_apple_silicon(void)
+{
+    static INIT_ONCE once = INIT_ONCE_STATIC_INIT;
+    InitOnceExecuteOnce(&once, init_is_apple_silicon, NULL, NULL);
+    return apple_silicon_status;
+}
 
 struct display_mode_descriptor
 {
@@ -576,7 +598,7 @@ static CFDictionaryRef create_mode_dict(CGDisplayModeRef display_mode, BOOL is_o
             CFSTR("pixel_encoding"),
             CFSTR("refresh_rate"),
         };
-        const void* values[ARRAY_SIZE(keys)] = {
+        const void* HOSTPTR values[ARRAY_SIZE(keys)] = {
             cf_io_flags,
             cf_width,
             cf_height,
@@ -584,7 +606,7 @@ static CFDictionaryRef create_mode_dict(CGDisplayModeRef display_mode, BOOL is_o
             cf_refresh,
         };
 
-        ret = CFDictionaryCreate(NULL, (const void**)keys, (const void**)values, ARRAY_SIZE(keys),
+        ret = CFDictionaryCreate(NULL, (const void* HOSTPTR * HOSTPTR)keys, (const void* HOSTPTR * HOSTPTR)values, ARRAY_SIZE(keys),
                                  &kCFCopyStringDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     }
 
@@ -622,10 +644,10 @@ static CFArrayRef copy_display_modes(CGDirectDisplayID display)
         struct display_mode_descriptor* desc;
         CFMutableDictionaryRef modes_by_size;
         CFIndex i, count;
-        CGDisplayModeRef* mode_array;
+        CGDisplayModeRef* WIN32PTR mode_array;
 
-        options = CFDictionaryCreate(NULL, (const void**)&kCGDisplayShowDuplicateLowResolutionModes,
-                                     (const void**)&kCFBooleanTrue, 1, &kCFTypeDictionaryKeyCallBacks,
+        options = CFDictionaryCreate(NULL, (const void* HOSTPTR * HOSTPTR)&kCGDisplayShowDuplicateLowResolutionModes,
+                                     (const void* HOSTPTR * HOSTPTR)&kCFBooleanTrue, 1, &kCFTypeDictionaryKeyCallBacks,
                                      &kCFTypeDictionaryValueCallBacks);
 
         modes = CGDisplayCopyAllDisplayModes(display, options);
@@ -716,8 +738,8 @@ static CFArrayRef copy_display_modes(CGDirectDisplayID display)
 
         count = CFDictionaryGetCount(modes_by_size);
         mode_array = HeapAlloc(GetProcessHeap(), 0, count * sizeof(mode_array[0]));
-        CFDictionaryGetKeysAndValues(modes_by_size, NULL, (const void **)mode_array);
-        modes = CFArrayCreate(NULL, (const void **)mode_array, count, &kCFTypeArrayCallBacks);
+        CFDictionaryGetKeysAndValues(modes_by_size, NULL, (const void * HOSTPTR * HOSTPTR)mode_array);
+        modes = CFArrayCreate(NULL, (const void * HOSTPTR * HOSTPTR)mode_array, count, &kCFTypeArrayCallBacks);
         HeapFree(GetProcessHeap(), 0, mode_array);
         CFRelease(modes_by_size);
     }
@@ -849,7 +871,9 @@ LONG CDECL macdrv_ChangeDisplaySettingsEx(LPCWSTR devname, LPDEVMODEW devmode,
             height *= 2;
         }
 
-        if (!(io_flags & kDisplayModeValidFlag) || !(io_flags & kDisplayModeSafeFlag))
+        /* CrossOver Hack #18576: don't check for kDisplayModeSafeFlag on Apple Silicon. */
+        if (!(io_flags & kDisplayModeValidFlag) ||
+            (!(io_flags & kDisplayModeSafeFlag) && !is_apple_silicon()))
             continue;
 
         safe++;
@@ -928,6 +952,8 @@ better:
             size_t width = CGDisplayModeGetWidth(best_display_mode);
             size_t height = CGDisplayModeGetHeight(best_display_mode);
 
+            macdrv_init_display_devices(TRUE);
+
             if (best_is_original && retina_enabled)
             {
                 width *= 2;
@@ -937,8 +963,6 @@ better:
             SendMessageW(GetDesktopWindow(), WM_MACDRV_UPDATE_DESKTOP_RECT, mode_bpp,
                          MAKELPARAM(width, height));
             ret = DISP_CHANGE_SUCCESSFUL;
-
-            macdrv_init_display_devices(TRUE);
         }
         else
         {
@@ -1042,8 +1066,10 @@ BOOL CDECL macdrv_EnumDisplaySettingsEx(LPCWSTR devname, DWORD mode,
                 CGDisplayModeRef candidate = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, i);
 
                 io_flags = CGDisplayModeGetIOFlags(candidate);
+                /* CrossOver Hack #18576: don't check for kDisplayModeSafeFlag on Apple Silicon. */
                 if (!(flags & EDS_RAWMODE) &&
-                    (!(io_flags & kDisplayModeValidFlag) || !(io_flags & kDisplayModeSafeFlag)))
+                    (!(io_flags & kDisplayModeValidFlag) ||
+                     (!(io_flags & kDisplayModeSafeFlag) && !is_apple_silicon())))
                     continue;
 
                 seen_modes++;
@@ -1171,7 +1197,7 @@ BOOL CDECL macdrv_GetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp)
     int num_displays;
     uint32_t mac_entries;
     int win_entries = ARRAY_SIZE(r->red);
-    CGGammaValue *red, *green, *blue;
+    CGGammaValue * WIN32PTR red, * WIN32PTR green, * WIN32PTR blue;
     CGError err;
     int win_entry;
 
@@ -1253,7 +1279,7 @@ BOOL CDECL macdrv_SetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp)
     struct macdrv_display *displays;
     int num_displays;
     int win_entries = ARRAY_SIZE(r->red);
-    CGGammaValue *red, *green, *blue;
+    CGGammaValue * WIN32PTR red, * WIN32PTR green, * WIN32PTR blue;
     int i;
     CGError err = kCGErrorFailure;
 
@@ -1439,6 +1465,7 @@ static BOOL macdrv_init_adapter(HKEY video_hkey, int video_index, int gpu_index,
     BOOL ret = FALSE;
     LSTATUS ls;
     INT i;
+    DWORD temp;
 
     sprintfW(key_nameW, device_video_fmtW, video_index);
     lstrcpyW(bufferW, machine_prefixW);
@@ -1483,8 +1510,9 @@ static BOOL macdrv_init_adapter(HKEY video_hkey, int video_index, int gpu_index,
     }
 
     /* Write StateFlags */
-    if (RegSetValueExW(hkey, state_flagsW, 0, REG_DWORD, (const BYTE *)&adapter->state_flags,
-                       sizeof(adapter->state_flags)))
+    temp = adapter->state_flags;
+    if (RegSetValueExW(hkey, state_flagsW, 0, REG_DWORD, (const BYTE *)&temp,
+                       sizeof(temp)))
         goto done;
 
     ret = TRUE;
@@ -1511,6 +1539,7 @@ static BOOL macdrv_init_monitor(HDEVINFO devinfo, const struct macdrv_monitor *m
     HKEY hkey;
     RECT rect;
     BOOL ret = FALSE;
+    DWORD temp;
 
     /* Create GUID_DEVCLASS_MONITOR instance */
     sprintfW(bufferW, monitor_instance_fmtW, video_index, monitor_index);
@@ -1531,8 +1560,9 @@ static BOOL macdrv_init_monitor(HDEVINFO devinfo, const struct macdrv_monitor *m
     /* FIXME:
      * Following properties are Wine specific, see comments in macdrv_init_adapter for details */
     /* StateFlags */
+    temp = monitor->state_flags;
     if (!SetupDiSetDevicePropertyW(devinfo, &device_data, &WINE_DEVPROPKEY_MONITOR_STATEFLAGS, DEVPROP_TYPE_UINT32,
-                                   (const BYTE *)&monitor->state_flags, sizeof(monitor->state_flags), 0))
+                                   (const BYTE *)&temp, sizeof(temp), 0))
         goto done;
     /* RcMonitor */
     rect = rect_from_cgrect(monitor->rc_monitor);
@@ -1658,6 +1688,8 @@ void macdrv_init_display_devices(BOOL force)
     if (macdrv_get_gpus(&gpus, &gpu_count))
         goto done;
     TRACE("GPU count: %d\n", gpu_count);
+    if (!gpu_count)
+        ERR("No GPUs detected\n");
 
     for (gpu = 0; gpu < gpu_count; gpu++)
     {

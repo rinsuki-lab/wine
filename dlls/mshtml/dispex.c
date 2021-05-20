@@ -1101,6 +1101,10 @@ static HRESULT builtin_propput(DispatchEx *This, func_info_t *func, DISPPARAMS *
     }
 
     if(!func->put_vtbl_off) {
+        if(dispex_compat_mode(This) >= COMPAT_MODE_IE9) {
+            WARN("No setter\n");
+            return S_OK;
+        }
         FIXME("No setter\n");
         return E_FAIL;
     }
@@ -1679,6 +1683,12 @@ static HRESULT WINAPI DispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR bst
     DispatchEx *This = impl_from_IDispatchEx(iface);
 
     TRACE("(%p)->(%s %x)\n", This, debugstr_w(bstrName), grfdex);
+
+    /* HACK: needed by Office; we shouldn't use IDispatchEx in this case */
+    if(dispex_compat_mode(This) >= COMPAT_MODE_IE9) {
+        FIXME("returning S_OK\n");
+        return S_OK;
+    }
 
     /* Not implemented by IE */
     return E_NOTIMPL;

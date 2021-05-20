@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__i386_on_x86_64__)
 
 #include "config.h"
 #include "wine/port.h"
@@ -286,16 +286,33 @@ static size_t signal_stack_size;
 
 typedef void (*raise_func)( EXCEPTION_RECORD *rec, CONTEXT *context );
 
+typedef struct _CONTEXT_CHUNK
+{
+    LONG Offset;
+    ULONG Length;
+} CONTEXT_CHUNK, *PCONTEXT_CHUNK;
+
+typedef struct _CONTEXT_EX
+{
+    CONTEXT_CHUNK All;
+    CONTEXT_CHUNK Legacy;
+    CONTEXT_CHUNK XState;
+#ifdef _WIN64
+    ULONG64 align;
+#endif
+} CONTEXT_EX, *PCONTEXT_EX;
+
 /* stack layout when calling an exception raise function */
 struct stack_layout
 {
     CONTEXT           context;
+    CONTEXT_EX        context_ex;
     EXCEPTION_RECORD  rec;
     ULONG64           rsi;
     ULONG64           rdi;
     ULONG64           rbp;
     ULONG64           rip;
-    ULONG64           red_zone[16];
+    ULONG64           align;
 };
 
 typedef int (*wine_signal_handler)(unsigned int sig);
@@ -354,6 +371,8 @@ static inline void set_sigcontext( const CONTEXT *context, ucontext_t *sigcontex
     SS_sig(sigcontext) = context->SegSs;
 #endif
 }
+
+extern void DECLSPEC_NORETURN __wine_syscall_dispatcher( void );
 
 
 /***********************************************************************
@@ -1524,7 +1543,13 @@ static NTSTATUS libunwind_virtual_unwind( ULONG64 ip, BOOL* got_info, ULONG64 *f
            ip, (unsigned long)info.start_ip, (unsigned long)info.end_ip, (unsigned long)info.handler,
            (unsigned long)info.lsda, (unsigned long)info.unwind_info );
 
-    if (!(rc = unw_step( &cursor )))
+    if (!(rc = unw_step( &cursor ))
+#ifdef __APPLE__
+        /* Apple's libunwind returns 0 here not only if there's no info to make the step,
+         * but also when it can't find info for the parent frame. Just ignore this case. */
+        && !info.format
+#endif
+        )
     {
         WARN( "last frame\n" );
         *got_info = FALSE;
@@ -2608,23 +2633,47 @@ NTSTATUS WINAPI NtRaiseException( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL 
  *
  * Generic raise function for exceptions that don't need special treatment.
  */
-static void raise_generic_exception( EXCEPTION_RECORD *rec, CONTEXT *context )
+void WINAPI raise_generic_exception( EXCEPTION_RECORD *rec, CONTEXT *context )
 {
     NTSTATUS status = raise_exception( rec, context, TRUE );
     raise_status( status, rec );
 }
 
+void KiUserExceptionDispatcher(void);
+/*******************************************************************
+ *		KiUserExceptionDispatcher (NTDLL.@)
+ */
+__ASM_GLOBAL_FUNC( KiUserExceptionDispatcher,
+                  "mov 0x98(%rsp),%rcx\n\t" /* context->Rsp */
+                  "mov 0xf8(%rsp),%rdx\n\t" /* context->Rip */
+                  "mov %rdx,-0x8(%rcx)\n\t"
+                  "mov %rbp,-0x10(%rcx)\n\t"
+                  "mov %rdi,-0x18(%rcx)\n\t"
+                  "mov %rsi,-0x20(%rcx)\n\t"
+                  "lea -0x20(%rcx),%rbp\n\t"
+                  "mov %rsp,%rdx\n\t" /* context */
+                  "lea 0x4f0(%rsp),%rcx\n\t" /* rec */
+                  __ASM_SEH(".seh_pushreg %rbp\n\t")
+                  __ASM_SEH(".seh_pushreg %rdi\n\t")
+                  __ASM_SEH(".seh_pushreg %rsi\n\t")
+                  __ASM_SEH(".seh_setframe %rbp,0\n\t")
+                  __ASM_SEH(".seh_endprologue\n\t")
 
-extern void raise_func_trampoline( EXCEPTION_RECORD *rec, CONTEXT *context, raise_func func );
+                  __ASM_CFI(".cfi_signal_frame\n\t")
+                  __ASM_CFI(".cfi_adjust_cfa_offset 0x20\n\t")
+                  __ASM_CFI(".cfi_def_cfa %rbp,0x20\n\t")
+                  __ASM_CFI(".cfi_rel_offset %rip,0x18\n\t")
+                  __ASM_CFI(".cfi_rel_offset %rbp,0x10\n\t")
+                  __ASM_CFI(".cfi_rel_offset %rdi,0x8\n\t")
+                  __ASM_CFI(".cfi_rel_offset %rsi,0\n\t")
+                   "call " __ASM_NAME("raise_generic_exception") "\n\t"
+                  "int3")
+
+extern void CDECL raise_func_trampoline( void *dispatcher );
+
 __ASM_GLOBAL_FUNC( raise_func_trampoline,
-                   __ASM_CFI(".cfi_signal_frame\n\t")
-                   __ASM_CFI(".cfi_def_cfa %rbp,160\n\t")  /* red zone + rip + rbp + rdi + rsi */
-                   __ASM_CFI(".cfi_rel_offset %rip,24\n\t")
-                   __ASM_CFI(".cfi_rel_offset %rbp,16\n\t")
-                   __ASM_CFI(".cfi_rel_offset %rdi,8\n\t")
-                   __ASM_CFI(".cfi_rel_offset %rsi,0\n\t")
-                   "call *%rdx\n\t"
-                   "int $3")
+                   "jmpq *%r8\n\t")
+
 
 /***********************************************************************
  *           setup_exception
@@ -2706,7 +2755,6 @@ static struct stack_layout *setup_exception( ucontext_t *sigcontext )
 
 static void setup_raise_exception( ucontext_t *sigcontext, struct stack_layout *stack )
 {
-    ULONG64 *rsp_ptr;
     NTSTATUS status;
 
     if (stack->rec.ExceptionCode == EXCEPTION_SINGLE_STEP)
@@ -2734,19 +2782,11 @@ static void setup_raise_exception( ucontext_t *sigcontext, struct stack_layout *
         return;
     }
 
-    /* store return address and %rbp without aligning, so that the offset is fixed */
-    rsp_ptr = (ULONG64 *)RSP_sig(sigcontext) - 16;
-    *(--rsp_ptr) = stack->context.Rip;
-    *(--rsp_ptr) = stack->context.Rbp;
-    *(--rsp_ptr) = stack->context.Rdi;
-    *(--rsp_ptr) = stack->context.Rsi;
+
 
     /* now modify the sigcontext to return to the raise function */
     RIP_sig(sigcontext) = (ULONG_PTR)raise_func_trampoline;
-    RDI_sig(sigcontext) = (ULONG_PTR)&stack->rec;
-    RSI_sig(sigcontext) = (ULONG_PTR)&stack->context;
-    RDX_sig(sigcontext) = (ULONG_PTR)raise_generic_exception;
-    RBP_sig(sigcontext) = (ULONG_PTR)rsp_ptr;
+    R8_sig(sigcontext) = (ULONG_PTR)KiUserExceptionDispatcher;
     RSP_sig(sigcontext) = (ULONG_PTR)stack;
     /* clear single-step, direction, and align check flag */
     EFL_sig(sigcontext) &= ~(0x100|0x400|0x40000);
@@ -3133,6 +3173,7 @@ NTSTATUS signal_alloc_thread( TEB **teb )
     {
         (*teb)->Tib.Self = &(*teb)->Tib;
         (*teb)->Tib.ExceptionList = (void *)~0UL;
+        (*teb)->WOW32Reserved = __wine_syscall_dispatcher;
     }
     return status;
 }
@@ -3242,6 +3283,9 @@ void signal_init_thread( TEB *teb )
     __asm__ volatile (".byte 0x65\n\tmovq %0,%c1"
                       :
                       : "r" (teb->ThreadLocalStoragePointer), "n" (FIELD_OFFSET(TEB, ThreadLocalStoragePointer)));
+    __asm__ volatile (".byte 0x65\n\tmovq %0,%c1"
+                      :
+                      : "r" (teb->Peb), "n" (FIELD_OFFSET(TEB, Peb)));
 
     /* alloc_tls_slot() needs to poke a value to an address relative to each
        thread's gsbase.  Have each thread record its gsbase pointer into its
@@ -4244,6 +4288,20 @@ PCONTEXT DECLSPEC_HIDDEN attach_thread( LPTHREAD_START_ROUTINE entry, void *arg,
  */
 void signal_start_thread( LPTHREAD_START_ROUTINE entry, void *arg, BOOL suspend )
 {
+#ifdef __APPLE__
+    TEB *teb = NtCurrentTeb();
+
+    /* Preallocate TlsExpansionSlots for secondary threads.  Otherwise, kernelbase will
+       allocate it on demand, but won't be able to do the Mac-specific poking to the
+       %gs-relative address. */
+    if (!teb->TlsExpansionSlots)
+        teb->TlsExpansionSlots = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                                  8 * sizeof(teb->Peb->TlsExpansionBitmapBits) * sizeof(void*) );
+    __asm__ volatile ("movq %0,%%gs:%c1"
+                      :
+                      : "r" (teb->TlsExpansionSlots), "n" (FIELD_OFFSET(TEB, TlsExpansionSlots)));
+#endif
+
     start_thread( entry, arg, suspend, call_thread_func );
 }
 
@@ -4288,4 +4346,4 @@ __ASM_STDCALL_FUNC( DbgBreakPoint, 0, "int $3; ret")
  */
 __ASM_STDCALL_FUNC( DbgUserBreakPoint, 0, "int $3; ret")
 
-#endif  /* __x86_64__ */
+#endif  /* __x86_64__ && !__i386_on_x86_64__ */

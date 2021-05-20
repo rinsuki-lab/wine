@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <unistd.h>
 #ifdef HAVE_SYS_IOCTL_H
 # include <sys/ioctl.h>
 #endif
@@ -59,10 +60,10 @@ typedef struct
 
 #define DKIOCSCSIIDENTIFY _IOR('d', 254, dk_scsi_identify_t)
 
-static void appeared_callback( DADiskRef disk, void *context )
+static void appeared_callback( DADiskRef disk, void * HOSTPTR context )
 {
     CFDictionaryRef dict = DADiskCopyDescription( disk );
-    const void *ref;
+    const void * HOSTPTR ref;
     char device[64];
     char mount_point[PATH_MAX];
     char model[64];
@@ -150,7 +151,8 @@ static void appeared_callback( DADiskRef disk, void *context )
     else
         if (guid_ptr) add_volume( device, device, mount_point, DEVICE_HARDDISK_VOL, guid_ptr );
 
-    if ((fd = open( device, O_RDONLY )) >= 0)
+    if (!access( device, R_OK ) &&
+        (fd = open( device, O_RDONLY )) >= 0)
     {
         dk_scsi_identify_t dsi;
 
@@ -172,15 +174,15 @@ done:
     CFRelease( dict );
 }
 
-static void changed_callback( DADiskRef disk, CFArrayRef keys, void *context )
+static void changed_callback( DADiskRef disk, CFArrayRef keys, void * HOSTPTR context )
 {
     appeared_callback( disk, context );
 }
 
-static void disappeared_callback( DADiskRef disk, void *context )
+static void disappeared_callback( DADiskRef disk, void * HOSTPTR context )
 {
     CFDictionaryRef dict = DADiskCopyDescription( disk );
-    const void *ref;
+    const void * HOSTPTR ref;
     char device[100];
 
     if (!dict) return;
@@ -298,7 +300,7 @@ static CFStringRef find_service_id( const WCHAR *adapter )
 
         service = CFArrayGetValueAtIndex( services, i );
         name = SCNetworkInterfaceGetBSDName( SCNetworkServiceGetInterface(service) );
-        if (CFStringGetLength( name ) < ARRAY_SIZE( buf ))
+        if (name && CFStringGetLength( name ) < ARRAY_SIZE( buf ))
         {
             CFStringGetCharacters( name, CFRangeMake(0, CFStringGetLength(name)), buf );
             if (!lstrcmpW( buf, unix_name ) && (id = SCNetworkServiceGetServiceID( service )))

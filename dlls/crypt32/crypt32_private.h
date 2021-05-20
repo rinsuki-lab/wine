@@ -152,7 +152,7 @@ BOOL WINAPI CRYPT_AsnEncodePubKeyInfoNoNull(DWORD dwCertEncodingType,
  */
 HCRYPTPROV WINAPI I_CryptGetDefaultCryptProv(ALG_ID);
 
-HINSTANCE hInstance DECLSPEC_HIDDEN;
+extern HINSTANCE hInstance DECLSPEC_HIDDEN;
 
 void crypt_oid_init(void) DECLSPEC_HIDDEN;
 void crypt_oid_free(void) DECLSPEC_HIDDEN;
@@ -445,7 +445,7 @@ void init_empty_store(void) DECLSPEC_HIDDEN;
 /* Align up to a DWORD_PTR boundary
  */
 #define ALIGN_DWORD_PTR(x) (((x) + sizeof(DWORD_PTR) - 1) & ~(sizeof(DWORD_PTR) - 1))
-#define POINTER_ALIGN_DWORD_PTR(p) ((LPVOID)ALIGN_DWORD_PTR((DWORD_PTR)(p)))
+#define POINTER_ALIGN_DWORD_PTR(p) TRUNCCAST(LPVOID, ALIGN_DWORD_PTR((DWORD_PTR)(p)))
 
 /* Check if the OID is a small int
  */
