@@ -70,9 +70,6 @@ jobs:
         echo "::set-output name=sha::$(git rev-parse HEAD)"
     - uses: actions/download-artifact@v2
       with:
-        name: clang
-    - uses: actions/download-artifact@v2
-      with:
         name: wine
     - run: |
         mv wine.tar.gz wine.${{ steps.tag.outputs.tag }}.tar.gz
