@@ -11,14 +11,9 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - run: brew install freetype bison mingw-w64 molten-vk
-    - uses: actions/cache@v2
-      id: builded_toolchain
-      with:
-        path: clang.tar.gz
-        key: v1-clang-20210520.e44fe4a
     - name: Download clang
-      if: steps.builded_toolchain.outputs.cache-hit != 'true'
       run: wget -O clang.tar.gz https://github.com/rinsuki-lab/cwbgh/releases/download/20210520.e44fe4a/clang.20210520.e44fe4a.tar.gz
+    - run: brew install freetype bison mingw-w64 molten-vk
     - name: Extract clang
       run: |
         sudo mkdir -p /opt/cwbgh/llvm
@@ -28,6 +23,7 @@ jobs:
         LLVM_TAR_GZ=$(pwd)/clang.tar.gz
         cd /
         tar xf $LLVM_TAR_GZ
+        rm $LLVM_TAR_GZ
     - name: Prepare for Build
       run: |
         cp .github/workflows/distversion.h ./include/
