@@ -59,7 +59,7 @@ jobs:
   upload-to-release:
     runs-on: macOS-latest
     needs:
-    - build-wine
+    - build
     if: success() && !contains(github.event.head_commit.message, '[skip release]') && github.event_name == 'push' && github.ref == 'refs/heads/rinsuki-master'
     steps:
     - uses: actions/checkout@master
