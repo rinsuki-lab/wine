@@ -28,22 +28,20 @@ jobs:
         LLVM_TAR_GZ=$(pwd)/clang.tar.gz
         cd /
         tar xf $LLVM_TAR_GZ
-    - name: Build
+    - name: Prepare for Build
       run: |
-        export PATH="/opt/cwbgh/llvm/bin:/usr/local/opt/bison/bin:$PATH"
-        export CROSSCFLAGS="-g -O2 -fcommon"
-        export CC="clang"
-        export CXX="clang++"
-        export MACOSX_DEPLOYMENT_TARGET=10.15
         cp .github/workflows/distversion.h ./include/
-        # Build Wine64
+    - name: Build Wine64
+      run: |
+        source .github/workflows/env.sh
         mkdir build64
         cd build64
         ../configure --enable-win64 --disable-winedbg --disable-tests --without-x --disable-mscms --prefix=/opt/crossover-wine ac_cv_lib_soname_MoltenVK=libMoltenVK.dylib ac_cv_lib_soname_vulkan=
         make -j4
         make install
-        # Build Wine32
-        cd ../
+    - name: Build Wine32on64
+      run: |
+        source .github/workflows/env.sh
         mkdir build32
         cd build32
         ../configure --enable-win32on64 --with-wine64=../build64 --disable-winedbg --disable-tests --without-x --disable-mscms --prefix=/opt/crossover-wine ac_cv_lib_soname_MoltenVK=libMoltenVK.dylib ac_cv_lib_soname_vulkan=
