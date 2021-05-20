@@ -1,0 +1,97 @@
+name: Build
+on:
+  push:
+    branches:
+    - rinsuki-master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@master
+    - run: brew install freetype bison mingw-w64
+    - uses: actions/cache@v2
+      id: builded_toolchain
+      with:
+        path: clang.tar.gz
+        key: v1-clang-20210520.e44fe4a
+    - name: Download clang
+      if: steps.builded_toolchain.outputs.cache-hit != 'true'
+      run: wget -O clang.tar.gz https://github.com/rinsuki-lab/cwbgh/releases/download/20210520.e44fe4a/clang.20210520.e44fe4a.tar.gz
+    - name: Extract clang
+      run: |
+        sudo mkdir -p /opt/cwbgh/llvm
+        sudo chown -R $(whoami) /opt/cwbgh
+        sudo mkdir -p /opt/crossover-wine
+        sudo chown -R $(whoami) /opt/crossover-wine
+        LLVM_TAR_GZ=$(pwd)/clang.tar.gz
+        cd /
+        tar xf $LLVM_TAR_GZ
+    - name: Build
+      run: |
+        export PATH="/opt/cwbgh/llvm/bin:/usr/local/opt/bison/bin:$PATH"
+        export CROSSCFLAGS="-g -O2 -fcommon"
+        export CC="clang"
+        export CXX="clang++"
+        export MACOSX_DEPLOYMENT_TARGET=10.15
+        cp .github/workflows/distversion.h ./include/
+        # Build Wine64
+        mkdir build64
+        cd build64
+        ../configure --enable-win64 --disable-winedbg --disable-tests --disable-winevulkan --without-x --without-vulkan --disable-mscms --prefix=/opt/crossover-wine
+        make -j4
+        make install
+        # Build Wine32
+        cd ../
+        mkdir build32
+        cd build32
+        ../configure --enable-win32on64 --with-wine64=../build64 --disable-winedbg --disable-tests --disable-winevulkan --without-x --without-vulkan --disable-mscms --prefix=/opt/crossover-wine
+        make -j4
+        make install
+    - name: Archive
+      run: |
+        tar czf wine.tar.gz /opt/crossover-wine
+    - uses: actions/upload-artifact@v2
+      with:
+        name: wine
+        path: wine.tar.gz
+  upload-to-release:
+    runs-on: macOS-latest
+    needs:
+    - build-wine
+    if: success() && !contains(github.event.head_commit.message, '[skip release]') && github.event_name == 'push' && github.ref == 'refs/heads/rinsuki-master'
+    steps:
+    - uses: actions/checkout@master
+    - name: Create Tag String
+      id: tag
+      run: |
+        echo "::set-output name=tag::$(date +%Y%m%d).$(git rev-parse --short HEAD)"
+        echo "::set-output name=sha::$(git rev-parse HEAD)"
+    - uses: actions/download-artifact@v2
+      with:
+        name: clang
+    - uses: actions/download-artifact@v2
+      with:
+        name: wine
+    - run: |
+        mv wine.tar.gz wine.${{ steps.tag.outputs.tag }}.tar.gz
+    - uses: actions/create-release@v1 
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.tag }}
+        release_name: Automatically Build ${{ steps.tag.outputs.tag }}
+        body: |
+          based on ${{ steps.tag.outputs.sha }}
+        draft: true
+        prerelease: true
+    - uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./wine.${{ steps.tag.outputs.tag }}.tar.gz
+        asset_name: wine.${{ steps.tag.outputs.tag }}.tar.gz
+        asset_content_type: application/x-gzip
