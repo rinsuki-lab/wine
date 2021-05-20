@@ -10,7 +10,7 @@ jobs:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@master
-    - run: brew install freetype bison mingw-w64
+    - run: brew install freetype bison mingw-w64 molten-vk
     - uses: actions/cache@v2
       id: builded_toolchain
       with:
@@ -39,14 +39,14 @@ jobs:
         # Build Wine64
         mkdir build64
         cd build64
-        ../configure --enable-win64 --disable-winedbg --disable-tests --disable-winevulkan --without-x --without-vulkan --disable-mscms --prefix=/opt/crossover-wine
+        ../configure --enable-win64 --disable-winedbg --disable-tests --without-x --disable-mscms --prefix=/opt/crossover-wine ac_cv_lib_soname_MoltenVK=libMoltenVK.dylib ac_cv_lib_soname_vulkan=
         make -j4
         make install
         # Build Wine32
         cd ../
         mkdir build32
         cd build32
-        ../configure --enable-win32on64 --with-wine64=../build64 --disable-winedbg --disable-tests --disable-winevulkan --without-x --without-vulkan --disable-mscms --prefix=/opt/crossover-wine
+        ../configure --enable-win32on64 --with-wine64=../build64 --disable-winedbg --disable-tests --without-x --disable-mscms --prefix=/opt/crossover-wine ac_cv_lib_soname_MoltenVK=libMoltenVK.dylib ac_cv_lib_soname_vulkan=
         make -j4
         make install
     - name: Archive
