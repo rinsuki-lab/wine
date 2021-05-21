@@ -50,10 +50,40 @@ jobs:
       with:
         name: wine
         path: wine.tar.gz
+  test:
+    runs-on: macOS-latest
+    needs:
+    - build
+    env:
+      WINEDLLOVERRIDES: "mscoree,mshtml=" # disable wine-{mono,gecko} installation confirm dialog
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/download-artifact@v2
+      with:
+        name: wine
+    - run: brew install mingw-w64
+    - name: Extract Wine
+      run: |
+        WINE_TAR_GZ=$(pwd)/wine.tar.gz
+        sudo mkdir -p /opt/crossover-wine
+        sudo chown -R $(whoami) /opt/crossover-wine
+        cd /
+        tar xzf $WINE_TAR_GZ
+    - name: Test win64
+      run: |
+        x86_64-w64-mingw32-gcc -o win64-test.exe .github/workflows/wintest.c
+        /opt/crossover-wine/bin/wine64 win64-test.exe win64.txt
+        test -f win64.txt
+    - name: Test win32on64
+      run: |
+        i686-w64-mingw32-gcc -o win32-test.exe .github/workflows/wintest.c
+        /opt/crossover-wine/bin/wine32on64 win32-test.exe win32.txt
+        test -f win32.txt
   upload-to-release:
     runs-on: macOS-latest
     needs:
     - build
+    - test
     if: success() && !contains(github.event.head_commit.message, '[skip release]') && github.event_name == 'push' && github.ref == 'refs/heads/rinsuki-master'
     steps:
     - uses: actions/checkout@master
