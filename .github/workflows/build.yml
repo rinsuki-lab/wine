@@ -65,6 +65,8 @@ jobs:
     - name: Extract Wine
       run: |
         WINE_TAR_GZ=$(pwd)/wine.tar.gz
+        sudo mkdir -p /opt/crossover-wine
+        sudo chown -R $(whoami) /opt/crossover-wine
         cd /
         tar xzf $WINE_TAR_GZ
     - name: Test win64
